@@ -1,0 +1,849 @@
+
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>İPKAP | İş Makineleri Eğitim Platformu</title>
+    
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        navy: '#0f172a',
+                        anthracite: '#374151',
+                        ipkapYellow: '#eab308'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        /* Modal Backdrop */
+        .modal-backdrop { background-color: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        const MOCK_USERS = [
+            { id: 1, name: 'Sistem Yöneticisi', email: 'admin@ipkap.com', password: '123', role: 'admin', status: 'active' },
+            { id: 2, name: 'Ahmet Usta', email: 'ahmet@ipkap.com', password: '123', role: 'instructor', balance: 2500, machines: ['Ekskavatör', 'Forklift'], status: 'active' },
+            { id: 3, name: 'Ali Öğrenci', email: 'ali@ipkap.com', password: '123', role: 'student', freeClassesLeft: 10, isSubscribed: false, status: 'active' }
+        ];
+
+        const MOCK_COURSES = [
+            { id: 101, title: 'Temel Forklift Teorik Eğitimi', instructorId: 2, instructorName: 'Ahmet Usta', category: 'Forklift', price: 250, date: '20.10.2026', time: '10:00', type: 'Teorik', capacity: 20, booked: 5 },
+            { id: 102, title: 'İleri Seviye Ekskavatör Güvenliği', instructorId: 2, instructorName: 'Ahmet Usta', category: 'Ekskavatör', price: 400, date: '21.10.2026', time: '14:00', type: 'Teorik', capacity: 15, booked: 14 },
+            { id: 103, title: 'Beko Loder Bakım Prensipleri', instructorId: 2, instructorName: 'Ahmet Usta', category: 'Beko Loder', price: 300, date: '25.10.2026', time: '09:00', type: 'Teorik', capacity: 20, booked: 0 }
+        ];
+
+        const MOCK_QUESTIONS = [
+            { id: 1, question: "Forklift kullanırken yük taşınan çatalların yerden yüksekliği ortalama ne kadar olmalıdır?", options: ["5-10 cm", "15-20 cm", "50-60 cm", "En az 1 metre"], answer: 1 },
+            { id: 2, question: "İş makinesi operatörünün şantiye alanında kullanması zorunlu olan kişisel koruyucu donanım hangisidir?", options: ["Güneş gözlüğü", "Baret ve fosforlu yelek", "Deri ceket", "Spor ayakkabı"], answer: 1 },
+            { id: 3, question: "Ekskavatör ile kırma işlemi yapılırken dikkat edilmesi gereken en önemli güvenlik kuralı nedir?", options: ["Motor devrini en düşüğe almak", "Çalışma alanında yetkisiz kişilerin bulunmamasını sağlamak", "Radyoyu kapatmak", "Camları açık tutmak"], answer: 1 }
+        ];
+
+        const IconUser = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>;
+        const IconBook = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path></svg>;
+        const IconCheck = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path></svg>;
+        const IconAlert = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>;
+        const IconClose = () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>;
+
+        const App = () => {
+            const [view, setView] = useState('home'); 
+            const [currentUser, setCurrentUser] = useState(null);
+            
+            const [users, setUsers] = useState(MOCK_USERS);
+            const [courses, setCourses] = useState(MOCK_COURSES);
+            const [reservations, setReservations] = useState([]); 
+            const [notifications, setNotifications] = useState([]);
+            
+            // Custom Modal State
+            const [modal, setModal] = useState({ isOpen: false, title: '', message: '', type: 'info', onConfirm: null });
+
+            const handleLogin = (email, password) => {
+                const user = users.find(u => u.email === email && u.password === password);
+                if (user) {
+                    setCurrentUser(user);
+                    if(user.role === 'student') setView('student');
+                    else if(user.role === 'instructor') setView('instructor');
+                    else if(user.role === 'admin') setView('admin');
+                    showToast(`Hoş geldin, ${user.name}`, 'success');
+                } else {
+                    showToast("E-posta veya şifre hatalı!", 'error');
+                }
+            };
+
+            const handleLogout = () => {
+                setCurrentUser(null);
+                setView('home');
+                showToast("Güvenle çıkış yapıldı.", 'success');
+            };
+
+            const showToast = (msg, type = 'success') => {
+                const id = Date.now();
+                setNotifications(prev => [{ id, msg, type }, ...prev]);
+                setTimeout(() => {
+                    setNotifications(prev => prev.filter(n => n.id !== id));
+                }, 4000); 
+            };
+
+            const closeModal = () => setModal({ isOpen: false, title: '', message: '', type: 'info', onConfirm: null });
+
+            const Navbar = () => (
+                <nav className="bg-navy text-white shadow-lg sticky top-0 z-50">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="flex justify-between h-16 items-center">
+                            <div className="flex items-center cursor-pointer" onClick={() => setView('home')}>
+                                <span className="text-ipkapYellow font-bold text-2xl tracking-wider">İPKAP</span>
+                            </div>
+                            <div className="hidden md:flex space-x-6 items-center">
+                                <button onClick={() => setView('home')} className="hover:text-ipkapYellow transition">Ana Sayfa</button>
+                                <button onClick={() => setView('catalog')} className="hover:text-ipkapYellow transition">Eğitimler</button>
+                                
+                                {!currentUser ? (
+                                    <>
+                                        <button onClick={() => setView('login')} className="hover:text-ipkapYellow transition">Giriş Yap</button>
+                                        <button onClick={() => setView('register')} className="bg-ipkapYellow text-navy px-4 py-2 rounded-md font-semibold hover:bg-yellow-400 transition">Kayıt Ol</button>
+                                    </>
+                                ) : (
+                                    <div className="flex items-center space-x-4">
+                                        <span className="text-sm text-gray-300">Hoş geldin, {currentUser.name}</span>
+                                        <button onClick={() => setView(currentUser.role)} className="bg-anthracite px-3 py-1 rounded hover:bg-gray-600 transition">Panelim</button>
+                                        <button onClick={handleLogout} className="bg-red-600 px-3 py-1 rounded hover:bg-red-700 transition">Çıkış</button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </nav>
+            );
+
+            const HomeView = () => (
+                <div className="fade-in">
+                    <div className="bg-navy text-white py-20 px-4">
+                        <div className="max-w-7xl mx-auto text-center">
+                            <h1 className="text-4xl md:text-6xl font-bold mb-6">İş Makinesi Operatörlüğüne Giden Yol <span className="text-ipkapYellow">Burada Başlıyor.</span></h1>
+                            <p className="text-lg md:text-xl text-gray-300 mb-10 max-w-3xl mx-auto">
+                                Tecrübeli operatörlerden öğren, teorik eğitimini tamamla ve uygun koşullarda pratik eğitim fırsatlarına ulaş. İPKAP ile kariyerine sağlam bir temel at.
+                            </p>
+                            <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4">
+                                <button onClick={() => setView('catalog')} className="w-full sm:w-auto bg-ipkapYellow text-navy px-8 py-3 rounded-lg font-bold text-lg hover:bg-yellow-400 transition shadow-lg">Eğitimlere Göz At</button>
+                                {!currentUser && <button onClick={() => setView('register')} className="w-full sm:w-auto bg-transparent border-2 border-gray-500 text-white px-8 py-3 rounded-lg font-bold text-lg hover:border-gray-300 hover:text-white transition">Eğitmen / Öğrenci Ol</button>}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="py-16 bg-white">
+                        <div className="max-w-7xl mx-auto px-4">
+                            <h2 className="text-3xl font-bold text-center text-navy mb-12">Sistem Nasıl Çalışır?</h2>
+                            <div className="grid md:grid-cols-4 gap-8 text-center">
+                                <div className="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                                    <div className="bg-ipkapYellow w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-navy font-bold text-2xl">1</div>
+                                    <h3 className="font-bold text-lg mb-2">Kayıt Ol</h3>
+                                    <p className="text-gray-600 text-sm">Ücretsiz hesabını oluştur. İlk 10 ders bizden hediye!</p>
+                                </div>
+                                <div className="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                                    <div className="bg-ipkapYellow w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-navy font-bold text-2xl">2</div>
+                                    <h3 className="font-bold text-lg mb-2">Teorik Eğitim</h3>
+                                    <p className="text-gray-600 text-sm">Uzman eğitmenlerden online canlı veya doküman destekli teorik eğitim al.</p>
+                                </div>
+                                <div className="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                                    <div className="bg-ipkapYellow w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-navy font-bold text-2xl">3</div>
+                                    <h3 className="font-bold text-lg mb-2">Sınava Hazırlık</h3>
+                                    <p className="text-gray-600 text-sm">Soru havuzumuzdaki deneme sınavlarıyla kendini test et.</p>
+                                </div>
+                                <div className="p-6 bg-gray-50 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                                    <div className="bg-ipkapYellow w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-navy font-bold text-2xl">4</div>
+                                    <h3 className="font-bold text-lg mb-2">Pratik Eğitim</h3>
+                                    <p className="text-gray-600 text-sm">Teoriği bitirince sahadaki pratik eğitimlere başvur ve sertifikanı al.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const AuthView = ({ mode }) => {
+                const [email, setEmail] = useState('');
+                const [password, setPassword] = useState('');
+                const [name, setName] = useState('');
+                const [role, setRole] = useState('student');
+                const [experience, setExperience] = useState('');
+                const [machines, setMachines] = useState('');
+
+                const submit = (e) => {
+                    e.preventDefault();
+                    if(mode === 'login') {
+                        handleLogin(email, password);
+                    } else {
+                        const emailExists = users.some(u => u.email === email);
+                        if(emailExists) {
+                            showToast("Bu e-posta adresi zaten kullanılıyor.", "error");
+                            return;
+                        }
+
+                        const newUser = {
+                            id: Date.now(), name, email, password, role, 
+                            status: role === 'instructor' ? 'pending' : 'active',
+                            ...(role === 'student' ? { freeClassesLeft: 10, isSubscribed: false } : { balance: 0, machines: machines.split(',').map(m=>m.trim()), experience })
+                        };
+                        setUsers([...users, newUser]);
+                        setCurrentUser(newUser);
+                        setView(role);
+                        if(role === 'instructor') {
+                            showToast("Kayıt başarılı! Hesabınız yönetici onayından sonra aktifleşecektir.", "success");
+                        } else {
+                            showToast("Aramıza hoş geldin! 10 ücretsiz ders hakkın tanımlandı.", "success");
+                        }
+                    }
+                };
+
+                return (
+                    <div className="flex-grow flex items-center justify-center bg-gray-50 fade-in py-10 px-4">
+                        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-gray-100">
+                            <h2 className="text-3xl font-bold text-navy mb-6 text-center">{mode === 'login' ? 'Giriş Yap' : 'Hesap Oluştur'}</h2>
+                            <form onSubmit={submit} className="space-y-5">
+                                {mode === 'register' && (
+                                    <div className="space-y-4 fade-in">
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Ad Soyad</label>
+                                            <input required type="text" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-ipkapYellow outline-none transition" value={name} onChange={e=>setName(e.target.value)} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold text-gray-700 mb-1">Hesap Türü</label>
+                                            <select className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-ipkapYellow outline-none transition" value={role} onChange={e=>setRole(e.target.value)}>
+                                                <option value="student">Öğrenci (Eğitim Almak İstiyorum)</option>
+                                                <option value="instructor">Eğitmen (Eğitim Vermek İstiyorum)</option>
+                                            </select>
+                                        </div>
+                                        {role === 'instructor' && (
+                                            <div className="space-y-4 fade-in bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                                <p className="text-xs text-blue-800 mb-2">Eğitmen başvuruları yönetici onayından geçmektedir.</p>
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Operatörlük Deneyimi (Yıl)</label>
+                                                    <input required type="number" min="1" className="w-full p-3 border border-gray-200 rounded-lg" value={experience} onChange={e=>setExperience(e.target.value)} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Kullandığı Makineler (Virgülle ayırın)</label>
+                                                    <input required type="text" placeholder="Örn: Ekskavatör, Loder" className="w-full p-3 border border-gray-200 rounded-lg" value={machines} onChange={e=>setMachines(e.target.value)} />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">E-posta Adresi</label>
+                                    <input required type="email" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-ipkapYellow outline-none transition" value={email} onChange={e=>setEmail(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-1">Şifre</label>
+                                    <input required type="password" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-ipkapYellow outline-none transition" value={password} onChange={e=>setPassword(e.target.value)} />
+                                </div>
+                                <button type="submit" className="w-full bg-navy text-white p-3 rounded-lg font-bold text-lg hover:bg-anthracite transition shadow-md">
+                                    {mode === 'login' ? 'Giriş Yap' : 'Kayıt Ol'}
+                                </button>
+                            </form>
+                            <div className="mt-6 text-center text-sm text-gray-600">
+                                {mode === 'login' ? (
+                                    <p>Hesabın yok mu? <span className="text-ipkapYellow cursor-pointer font-bold hover:underline" onClick={() => setView('register')}>Hemen Kayıt Ol</span></p>
+                                ) : (
+                                    <p>Zaten hesabın var mı? <span className="text-ipkapYellow cursor-pointer font-bold hover:underline" onClick={() => setView('login')}>Giriş Yap</span></p>
+                                )}
+                            </div>
+                            
+                            {mode === 'login' && (
+                                <div className="mt-8 p-4 bg-gray-100 text-xs text-gray-600 rounded-lg border border-gray-200">
+                                    <strong className="block mb-2 text-gray-800">Demo Test Hesapları:</strong>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div><span className="font-semibold">Öğrenci:</span> ali@ipkap.com</div><div>Şifre: 123</div>
+                                        <div><span className="font-semibold">Eğitmen:</span> ahmet@ipkap.com</div><div>Şifre: 123</div>
+                                        <div><span className="font-semibold">Yönetici:</span> admin@ipkap.com</div><div>Şifre: 123</div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            };
+
+            const StudentDashboard = () => {
+                const myReservations = reservations.filter(r => r.studentId === currentUser.id);
+                
+                const handlePracticalRequest = () => {
+                    if(myReservations.length > 0) {
+                        setModal({
+                            isOpen: true,
+                            title: 'Başvuru Alındı',
+                            message: 'Pratik eğitim başvurunuz sisteme başarıyla iletildi. İlgili eğitmen sizinle iletişime geçecektir.',
+                            type: 'info',
+                            onConfirm: closeModal
+                        });
+                    } else {
+                        setModal({
+                            isOpen: true,
+                            title: 'Başvuru Başarısız',
+                            message: 'Pratik eğitime başvurmak için önce en az 1 teorik eğitime kayıt olmalı ve tamamlamalısınız.',
+                            type: 'error',
+                            onConfirm: closeModal
+                        });
+                    }
+                };
+
+                return (
+                    <div className="max-w-7xl mx-auto px-4 py-8 fade-in">
+                        <h2 className="text-2xl font-bold text-navy mb-6">Öğrenci Paneli</h2>
+                        
+                        <div className="grid md:grid-cols-3 gap-6 mb-8">
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between">
+                                <div>
+                                    <h3 className="text-gray-500 text-sm font-semibold uppercase">Ücretsiz Ders Hakkı</h3>
+                                    <p className="text-4xl font-bold text-navy mt-2">{currentUser.freeClassesLeft} <span className="text-xl text-gray-400">/ 10</span></p>
+                                </div>
+                                {currentUser.freeClassesLeft === 0 && <button className="mt-4 w-full text-sm bg-navy text-white px-3 py-2 rounded font-semibold hover:bg-anthracite transition">Sınırsız Abonelik Başlat</button>}
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                <h3 className="text-gray-500 text-sm font-semibold uppercase">Kayıtlı Derslerim</h3>
+                                <p className="text-4xl font-bold text-navy mt-2">{myReservations.length}</p>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                                <h3 className="text-gray-500 text-sm font-semibold uppercase">Pratik Eğitim Durumu</h3>
+                                <div className="mt-4 flex items-center p-3 bg-yellow-50 text-yellow-800 rounded-lg border border-yellow-200">
+                                    <IconAlert /> <span className="ml-2 font-medium text-sm">Teorik Eğitim Bekleniyor</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-navy">Yaklaşan Derslerim</h3>
+                                <button onClick={() => setView('catalog')} className="text-sm bg-ipkapYellow text-navy px-5 py-2 rounded-lg font-bold hover:bg-yellow-400 transition shadow-sm">Yeni Ders Bul</button>
+                            </div>
+                            {myReservations.length === 0 ? (
+                                <div className="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                                    <p className="text-gray-500">Henüz kayıt olduğunuz bir ders bulunmuyor.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {myReservations.map(res => {
+                                        const course = courses.find(c => c.id === res.courseId);
+                                        return (
+                                            <div key={res.id} className="flex flex-col sm:flex-row justify-between sm:items-center p-4 border border-gray-100 rounded-lg bg-gray-50 hover:bg-white transition shadow-sm">
+                                                <div className="mb-4 sm:mb-0">
+                                                    <h4 className="font-bold text-navy text-lg">{course.title}</h4>
+                                                    <p className="text-sm text-gray-500 mt-1 flex items-center">
+                                                        <span className="bg-gray-200 px-2 py-0.5 rounded text-xs font-semibold mr-2">{course.category}</span>
+                                                        {course.date} - {course.time} | Eğitmen: {course.instructorName}
+                                                    </p>
+                                                </div>
+                                                <button className="bg-navy text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-anthracite transition">Derse Katıl</button>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <h3 className="text-xl font-bold text-navy mb-4">Hızlı İşlemler</h3>
+                            <div className="flex flex-col sm:flex-row gap-4">
+                                <button onClick={() => setView('exam')} className="flex-1 bg-anthracite text-white p-5 rounded-xl text-center hover:bg-gray-700 transition flex items-center justify-center font-semibold text-lg shadow-sm">
+                                    <span className="mr-2"><IconBook /></span> Sınava Hazırlık (Test Çöz)
+                                </button>
+                                <button onClick={handlePracticalRequest} className="flex-1 border-2 border-navy text-navy p-5 rounded-xl text-center hover:bg-gray-50 transition font-bold text-lg">
+                                    Pratik Eğitim Başvurusu Yap
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const InstructorDashboard = () => {
+                const myCourses = courses.filter(c => c.instructorId === currentUser.id);
+                const [showForm, setShowForm] = useState(false);
+                const [newCourse, setNewCourse] = useState({ title: '', category: 'Ekskavatör', date: '', time: '', price: 0, capacity: 10 });
+
+                const handleCreateCourse = (e) => {
+                    e.preventDefault();
+                    if(currentUser.status === 'pending') {
+                        showToast("Hesabınız henüz onaylanmadı. Ders açamazsınız.", "error");
+                        return;
+                    }
+
+                    // Çakışma kontrolü
+                    const conflict = myCourses.some(c => c.date === newCourse.date && c.time === newCourse.time);
+                    if (conflict) {
+                        setModal({
+                            isOpen: true, title: 'Zaman Çakışması', type: 'error',
+                            message: 'Bu tarih ve saatte zaten planlanmış bir dersiniz bulunuyor. Lütfen farklı bir saat seçin.',
+                            onConfirm: closeModal
+                        });
+                        return;
+                    }
+
+                    const courseToAdd = {
+                        ...newCourse,
+                        id: Date.now(), instructorId: currentUser.id, instructorName: currentUser.name,
+                        type: 'Teorik', booked: 0, price: Number(newCourse.price), capacity: Number(newCourse.capacity)
+                    };
+                    setCourses([...courses, courseToAdd]);
+                    setShowForm(false);
+                    showToast("Yeni ders başarıyla oluşturuldu.", "success");
+                    setNewCourse({ title: '', category: 'Ekskavatör', date: '', time: '', price: 0, capacity: 10 });
+                };
+                
+                return (
+                    <div className="max-w-7xl mx-auto px-4 py-8 fade-in">
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center mb-6">
+                            <h2 className="text-2xl font-bold text-navy mb-4 sm:mb-0">Eğitmen Paneli</h2>
+                            <span className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center shadow-sm w-fit ${currentUser.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' : 'bg-green-100 text-green-800 border border-green-200'}`}>
+                                {currentUser.status === 'pending' ? <><span className="mr-2"><IconAlert/></span> Onay Bekliyor</> : <><span className="mr-2"><IconCheck/></span> Onaylı Eğitmen</>}
+                            </span>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-3 gap-6 mb-8">
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-ipkapYellow">
+                                <h3 className="text-gray-500 text-sm font-semibold uppercase">Aktif Derslerim</h3>
+                                <p className="text-3xl font-bold text-navy mt-2">{myCourses.length}</p>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-green-500">
+                                <h3 className="text-gray-500 text-sm font-semibold uppercase">Toplam Kazanç</h3>
+                                <p className="text-3xl font-bold text-navy mt-2">{currentUser.balance} ₺</p>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-l-4 border-l-blue-500">
+                                <h3 className="text-gray-500 text-sm font-semibold uppercase">Bekleyen Pratik Talebi</h3>
+                                <p className="text-3xl font-bold text-navy mt-2">0</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-navy">Planlanmış Derslerim</h3>
+                                <button onClick={() => setShowForm(!showForm)} className={`text-sm px-5 py-2 rounded-lg font-bold transition shadow-sm ${showForm ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-ipkapYellow text-navy hover:bg-yellow-400'}`}>
+                                    {showForm ? 'Vazgeç' : 'Yeni Ders Aç'}
+                                </button>
+                            </div>
+
+                            {showForm && (
+                                <form onSubmit={handleCreateCourse} className="mb-8 p-6 bg-gray-50 border border-gray-200 rounded-xl space-y-4 fade-in">
+                                    <h4 className="font-bold text-navy mb-4 border-b border-gray-200 pb-2">Ders Detayları</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-sm font-semibold mb-1">Ders Başlığı</label>
+                                            <input required type="text" className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-ipkapYellow outline-none" value={newCourse.title} onChange={e=>setNewCourse({...newCourse, title: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold mb-1">Kategori</label>
+                                            <select className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-ipkapYellow outline-none" value={newCourse.category} onChange={e=>setNewCourse({...newCourse, category: e.target.value})}>
+                                                <option>Ekskavatör</option>
+                                                <option>Forklift</option>
+                                                <option>Beko Loder</option>
+                                                <option>Vinç</option>
+                                                <option>Greyder</option>
+                                                <option>Dozer</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold mb-1">Tarih (GG.AA.YYYY)</label>
+                                            <input required type="text" placeholder="Örn: 25.10.2026" className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-ipkapYellow outline-none" value={newCourse.date} onChange={e=>setNewCourse({...newCourse, date: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold mb-1">Saat (SS:DD)</label>
+                                            <input required type="text" placeholder="Örn: 14:00" className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-ipkapYellow outline-none" value={newCourse.time} onChange={e=>setNewCourse({...newCourse, time: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold mb-1">Ücret (₺)</label>
+                                            <input required type="number" min="0" className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-ipkapYellow outline-none" value={newCourse.price} onChange={e=>setNewCourse({...newCourse, price: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-semibold mb-1">Kontenjan</label>
+                                            <input required type="number" min="1" className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-ipkapYellow outline-none" value={newCourse.capacity} onChange={e=>setNewCourse({...newCourse, capacity: e.target.value})} />
+                                        </div>
+                                    </div>
+                                    <button type="submit" className="mt-4 bg-navy text-white px-6 py-3 rounded-lg font-bold hover:bg-anthracite transition shadow-md w-full md:w-auto">Dersi Yayına Al</button>
+                                </form>
+                            )}
+
+                            <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-gray-100 text-gray-700 text-sm uppercase tracking-wider">
+                                            <th className="p-4 font-semibold">Ders Adı</th>
+                                            <th className="p-4 font-semibold">Tarih / Saat</th>
+                                            <th className="p-4 font-semibold text-center">Durum</th>
+                                            <th className="p-4 font-semibold text-right">Ücret</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {myCourses.length === 0 && <tr><td colSpan="4" className="p-4 text-center text-gray-500">Kayıtlı dersiniz bulunmuyor.</td></tr>}
+                                        {myCourses.map(course => (
+                                            <tr key={course.id} className="hover:bg-gray-50 transition">
+                                                <td className="p-4 font-bold text-navy">{course.title} <br/><span className="text-xs font-normal text-gray-500">{course.category}</span></td>
+                                                <td className="p-4 text-sm text-gray-600">{course.date} <br/> {course.time}</td>
+                                                <td className="p-4 text-center">
+                                                    <span className="inline-block px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-bold border border-blue-100">
+                                                        {course.booked} / {course.capacity} Kayıt
+                                                    </span>
+                                                </td>
+                                                <td className="p-4 text-right font-bold text-green-600">{course.price} ₺</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const AdminDashboard = () => {
+                const studentCount = users.filter(u => u.role === 'student').length;
+                const instCount = users.filter(u => u.role === 'instructor').length;
+                const totalRevenue = users.filter(u => u.role === 'instructor').reduce((sum, u) => sum + (u.balance || 0), 0);
+                const pendingCount = users.filter(u => u.role === 'instructor' && u.status === 'pending').length;
+
+                return (
+                    <div className="max-w-7xl mx-auto px-4 py-8 fade-in">
+                        <h2 className="text-2xl font-bold text-navy mb-6">Sistem Yönetim Paneli</h2>
+                        
+                        <div className="grid md:grid-cols-4 gap-4 mb-8">
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-navy text-center">
+                                <h4 className="text-gray-500 text-xs font-bold uppercase tracking-widest">Kayıtlı Kullanıcı</h4>
+                                <p className="text-3xl font-black mt-2 text-navy">{users.length}</p>
+                                <p className="text-xs text-gray-400 mt-1">{studentCount} Öğrenci, {instCount} Eğitmen</p>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-ipkapYellow text-center">
+                                <h4 className="text-gray-500 text-xs font-bold uppercase tracking-widest">Aktif Dersler</h4>
+                                <p className="text-3xl font-black mt-2 text-navy">{courses.length}</p>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-green-500 text-center">
+                                <h4 className="text-gray-500 text-xs font-bold uppercase tracking-widest">Ekonomi Hacmi</h4>
+                                <p className="text-3xl font-black mt-2 text-green-600">{totalRevenue} ₺</p>
+                            </div>
+                            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 border-t-4 border-t-red-500 text-center">
+                                <h4 className="text-gray-500 text-xs font-bold uppercase tracking-widest">Bekleyen Onay</h4>
+                                <p className="text-3xl font-black mt-2 text-red-600">{pendingCount}</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                            <h3 className="font-bold text-lg mb-4 text-navy">Son Kayıt Olan Kullanıcılar</h3>
+                            <div className="space-y-3">
+                                {users.slice(-5).reverse().map(u => (
+                                    <div key={u.id} className="flex justify-between items-center text-sm p-4 bg-gray-50 rounded-lg border border-gray-100">
+                                        <div className="flex flex-col">
+                                            <span className="font-bold text-gray-800">{u.name}</span>
+                                            <span className="text-xs text-gray-500">{u.email}</span>
+                                        </div>
+                                        <div className="flex items-center space-x-3">
+                                            {u.status === 'pending' && <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold">Onay Bekliyor</span>}
+                                            <span className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs font-bold capitalize">{u.role === 'student' ? 'Öğrenci' : u.role === 'instructor' ? 'Eğitmen' : 'Admin'}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const CourseCatalog = () => {
+                
+                const processBooking = (course, useFreeClass) => {
+                    let updatedUser = { ...currentUser };
+                    
+                    if (useFreeClass) {
+                        updatedUser.freeClassesLeft -= 1;
+                    }
+
+                    // Rezervasyonu kaydet
+                    setReservations([...reservations, { id: Date.now(), studentId: currentUser.id, courseId: course.id, status: 'active' }]);
+                    
+                    // Dersin doluluk oranını artır
+                    const updatedCourses = courses.map(c => c.id === course.id ? {...c, booked: c.booked + 1} : c);
+                    setCourses(updatedCourses);
+
+                    // Kullanıcı state'ini ve Eğer ücretliyse Eğitmen bakiyesini güncelle
+                    const updatedUsersList = users.map(u => {
+                        if (u.id === updatedUser.id) return updatedUser;
+                        // Ödeme yapıldıysa parayı eğitmene aktar
+                        if (!useFreeClass && u.id === course.instructorId) return { ...u, balance: (u.balance || 0) + course.price };
+                        return u;
+                    });
+                    
+                    setUsers(updatedUsersList);
+                    setCurrentUser(updatedUser);
+
+                    showToast("Rezervasyon başarıyla tamamlandı!", "success");
+                    setView('student');
+                };
+
+                const handleBookingClick = (course) => {
+                    if (!currentUser) {
+                        showToast("Derse katılmak için önce giriş yapmalısınız.", "error");
+                        setView('login');
+                        return;
+                    }
+                    if (currentUser.role !== 'student') {
+                        showToast("Sadece öğrenci hesapları derse kayıt olabilir.", "error");
+                        return;
+                    }
+
+                    const isAlreadyBooked = reservations.some(r => r.studentId === currentUser.id && r.courseId === course.id);
+                    if (isAlreadyBooked) {
+                        showToast("Bu derse zaten kayıtlısınız.", "error");
+                        return;
+                    }
+
+                    // Modal üzerinden onay alma
+                    if (currentUser.freeClassesLeft > 0) {
+                        setModal({
+                            isOpen: true,
+                            title: 'Ders Rezervasyonu',
+                            message: `Bu ders için 1 adet ücretsiz ders hakkınız kullanılacaktır. Onaylıyor musunuz? (Kalan Hakkınız: ${currentUser.freeClassesLeft})`,
+                            type: 'confirm',
+                            onConfirm: () => {
+                                processBooking(course, true);
+                                closeModal();
+                            }
+                        });
+                    } else if (!currentUser.isSubscribed) {
+                        setModal({
+                            isOpen: true,
+                            title: 'Ödeme Onayı (Simülasyon)',
+                            message: `Ücretsiz ders hakkınız bitmiştir. Bu ders için kayıtlı kartınızdan ${course.price} ₺ tahsil edilerek eğitmene aktarılacaktır. Onaylıyor musunuz?`,
+                            type: 'confirm',
+                            onConfirm: () => {
+                                showToast(`${course.price} ₺ tahsil edildi.`, "success");
+                                processBooking(course, false);
+                                closeModal();
+                            }
+                        });
+                    }
+                };
+
+                return (
+                    <div className="max-w-7xl mx-auto px-4 py-10 fade-in">
+                        <div className="text-center mb-12">
+                            <h2 className="text-3xl font-bold text-navy mb-3">Eğitim Kataloğu</h2>
+                            <p className="text-gray-500 text-lg">Alanında uzman operatörlerden teorik eğitim alın ve kariyerinize yön verin.</p>
+                        </div>
+                        
+                        <div className="grid md:grid-cols-3 gap-8">
+                            {courses.map(course => (
+                                <div key={course.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col transition hover:shadow-xl hover:-translate-y-1 transform duration-300">
+                                    <div className="bg-navy h-3 w-full"></div>
+                                    <div className="p-6 flex-grow flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex justify-between items-start mb-4">
+                                                <span className="bg-yellow-50 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider border border-yellow-200">{course.category}</span>
+                                                <span className="font-black text-xl text-green-600">{course.price} ₺</span>
+                                            </div>
+                                            <h3 className="text-xl font-bold text-gray-900 mb-3 leading-tight">{course.title}</h3>
+                                            <p className="text-sm text-gray-600 mb-6 flex items-center bg-gray-50 p-2 rounded-lg w-fit"><IconUser/><span className="ml-2 font-medium">{course.instructorName}</span></p>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-3 text-sm text-gray-600 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                            <div><span className="block text-xs text-gray-400 font-semibold mb-1">Tarih</span> <strong className="text-navy">{course.date}</strong></div>
+                                            <div><span className="block text-xs text-gray-400 font-semibold mb-1">Saat</span> <strong className="text-navy">{course.time}</strong></div>
+                                            <div><span className="block text-xs text-gray-400 font-semibold mb-1">Tür</span> <strong className="text-navy">{course.type}</strong></div>
+                                            <div><span className="block text-xs text-gray-400 font-semibold mb-1">Durum</span> <strong className="text-navy">{course.capacity - course.booked} Boş</strong></div>
+                                        </div>
+                                    </div>
+                                    <div className="p-5 border-t border-gray-100 bg-white">
+                                        <button 
+                                            onClick={() => handleBookingClick(course)}
+                                            disabled={course.booked >= course.capacity}
+                                            className={`w-full py-3 rounded-xl font-bold transition text-lg shadow-sm ${course.booked >= course.capacity ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-ipkapYellow text-navy hover:bg-yellow-400 hover:shadow-md'}`}
+                                        >
+                                            {course.booked >= course.capacity ? 'Kontenjan Dolu' : 'Derse Katıl'}
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            };
+
+            const ExamPrep = () => {
+                const [currentQ, setCurrentQ] = useState(0);
+                const [score, setScore] = useState(0);
+                const [isFinished, setIsFinished] = useState(false);
+                const [selectedOption, setSelectedOption] = useState(null);
+
+                const handleAnswer = () => {
+                    if (selectedOption === null) return;
+                    
+                    if (selectedOption === MOCK_QUESTIONS[currentQ].answer) {
+                        setScore(score + 1);
+                    }
+
+                    if (currentQ < MOCK_QUESTIONS.length - 1) {
+                        setCurrentQ(currentQ + 1);
+                        setSelectedOption(null);
+                    } else {
+                        setIsFinished(true);
+                    }
+                };
+
+                return (
+                    <div className="max-w-3xl mx-auto px-4 py-10 fade-in">
+                        <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 border-t-8 border-t-ipkapYellow">
+                            <div className="flex justify-between items-center mb-8 border-b border-gray-100 pb-4">
+                                <h2 className="text-2xl font-bold text-navy">Ehliyet Sınavı Denemesi</h2>
+                                <button onClick={() => setView('student')} className="text-sm font-semibold text-gray-500 hover:text-navy transition">Panoya Dön</button>
+                            </div>
+
+                            {!isFinished ? (
+                                <div className="fade-in">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <p className="text-sm text-gray-500 font-bold uppercase tracking-wider">Soru {currentQ + 1} / {MOCK_QUESTIONS.length}</p>
+                                        <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-bold">İş Güvenliği Kategorisi</span>
+                                    </div>
+                                    <h3 className="text-xl font-bold mb-8 text-gray-900 leading-relaxed">{MOCK_QUESTIONS[currentQ].question}</h3>
+                                    
+                                    <div className="space-y-4">
+                                        {MOCK_QUESTIONS[currentQ].options.map((opt, idx) => (
+                                            <div 
+                                                key={idx} 
+                                                onClick={() => setSelectedOption(idx)}
+                                                className={`p-5 border-2 rounded-xl cursor-pointer transition font-medium ${selectedOption === idx ? 'bg-blue-50 border-blue-500 text-blue-900 shadow-sm' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50 text-gray-700'}`}
+                                            >
+                                                {String.fromCharCode(65 + idx)}) {opt}
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <button 
+                                        onClick={handleAnswer} 
+                                        disabled={selectedOption === null}
+                                        className={`mt-8 w-full py-4 rounded-xl font-bold text-lg text-white transition shadow-md ${selectedOption === null ? 'bg-gray-300 cursor-not-allowed' : 'bg-navy hover:bg-anthracite hover:shadow-lg'}`}
+                                    >
+                                        {currentQ === MOCK_QUESTIONS.length - 1 ? 'Sınavı Bitir ve Sonucu Gör' : 'Sonraki Soru'}
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="text-center py-12 fade-in">
+                                    <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+                                        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7"></path></svg>
+                                    </div>
+                                    <h3 className="text-3xl font-bold text-navy mb-3">Test Tamamlandı!</h3>
+                                    <p className="text-xl text-gray-600 mb-8">Puanınız: <strong className="text-green-600 text-2xl">{score} / {MOCK_QUESTIONS.length}</strong> doğru cevap.</p>
+                                    <div className="flex justify-center space-x-4">
+                                        <button onClick={() => { setCurrentQ(0); setScore(0); setIsFinished(false); setSelectedOption(null); }} className="bg-ipkapYellow text-navy px-8 py-3 rounded-lg font-bold hover:bg-yellow-400 transition shadow-sm">Tekrar Çöz</button>
+                                        <button onClick={() => setView('student')} className="bg-gray-200 text-gray-800 px-8 py-3 rounded-lg font-bold hover:bg-gray-300 transition shadow-sm">Panoya Dön</button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            };
+
+            const CustomModal = () => {
+                if (!modal.isOpen) return null;
+                return (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 fade-in modal-backdrop">
+                        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col">
+                            <div className={`p-4 text-white flex justify-between items-center ${modal.type === 'error' ? 'bg-red-600' : 'bg-navy'}`}>
+                                <h3 className="font-bold text-lg">{modal.title}</h3>
+                                <button onClick={closeModal} className="hover:text-gray-300 transition"><IconClose /></button>
+                            </div>
+                            <div className="p-6">
+                                <p className="text-gray-700 text-lg leading-relaxed">{modal.message}</p>
+                            </div>
+                            <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end space-x-3">
+                                {modal.type === 'confirm' && (
+                                    <button onClick={closeModal} className="px-5 py-2 rounded-lg font-semibold text-gray-600 hover:bg-gray-200 transition">İptal</button>
+                                )}
+                                <button 
+                                    onClick={modal.onConfirm || closeModal} 
+                                    className={`px-5 py-2 rounded-lg font-bold text-white transition shadow-sm ${modal.type === 'error' ? 'bg-red-600 hover:bg-red-700' : 'bg-ipkapYellow text-navy hover:bg-yellow-500'}`}
+                                >
+                                    {modal.type === 'confirm' ? 'Onaylıyorum' : 'Tamam'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const renderView = () => {
+                switch(view) {
+                    case 'home': return <HomeView />;
+                    case 'login': return <AuthView mode="login" />;
+                    case 'register': return <AuthView mode="register" />;
+                    case 'student': return <StudentDashboard />;
+                    case 'instructor': return <InstructorDashboard />;
+                    case 'admin': return <AdminDashboard />;
+                    case 'catalog': return <CourseCatalog />;
+                    case 'exam': return <ExamPrep />;
+                    default: return <HomeView />;
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col text-gray-800">
+                    <Navbar />
+                    
+                    {/* Toast Bildirimleri */}
+                    <div className="fixed bottom-6 right-6 z-[110] space-y-3 pointer-events-none">
+                        {notifications.map(n => (
+                            <div key={n.id} className={`pointer-events-auto px-5 py-3 rounded-lg shadow-xl flex items-center fade-in text-sm font-semibold border ${n.type === 'error' ? 'bg-red-50 text-red-800 border-red-200' : 'bg-green-50 text-green-800 border-green-200'}`}>
+                                {n.type === 'error' ? <IconAlert /> : <IconCheck />} 
+                                <span className="ml-3">{n.msg}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Custom Alert/Confirm Modal */}
+                    <CustomModal />
+
+                    <main className="flex-grow flex flex-col">
+                        {renderView()}
+                    </main>
+
+                    <footer className="bg-anthracite text-gray-400 py-10 text-sm mt-auto">
+                        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center">
+                            <div className="mb-4 md:mb-0 text-center md:text-left">
+                                <span className="text-white font-bold text-lg tracking-wider block mb-1">İPKAP</span>
+                                <p>© 2026 İş Makineleri Pratik, Kariyer ve Pazar Yeri.</p>
+                            </div>
+                            <div className="flex space-x-6 font-medium">
+                                <a href="#" className="hover:text-white transition">Hakkımızda</a>
+                                <a href="#" className="hover:text-white transition">İletişim</a>
+                                <a href="#" className="hover:text-white transition">Gizlilik Politikası</a>
+                            </div>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
